@@ -1,12 +1,17 @@
-from fastapi import FastAPI, UploadFile
+from fastapi import FastAPI, UploadFile, HTTPException
 import tempfile
+from pydantic import BaseModel
 import os
-from embedding_utils import get_cohere_embedding, get_db_connection
+from embedding_utils import get_cohere_embedding, get_db_connection, insert_job
 from resume_utils import extract_text_from_pdf
 import numpy as np
 import ast
 
 app = FastAPI()
+
+class JobCreate(BaseModel):
+    title: str
+    description: str
 
 def parse_embedding(embedding_str):
     emb_list = ast.literal_eval(embedding_str)
@@ -78,3 +83,12 @@ async def match_jobs(candidate_id: int):
     matches.sort(key=lambda x: x["score"], reverse=True)
     cur.close()
     return {"matches": matches[:5]}
+
+
+@app.post("/jobs")
+async def create_job(job: JobCreate):
+    try:
+        insert_job(job.title, job.description)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Job '{job.title}' inserted successfully"}
