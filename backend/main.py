@@ -7,24 +7,26 @@ import os
 from embedding_utils import get_ollama_embedding
 from resume_utils import extract_text_from_pdf
 
-
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # or ["http://localhost:3000"] for React dev
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 DB_CONN = None
 
 def get_db_connection():
     global DB_CONN
     if DB_CONN is None:
-        DB_CONN = psycopg2.connect(
-            dbname=os.environ["DB_NAME"],
-            user=os.environ["DB_USER"],
-            password=os.environ["DB_PASSWORD"],
-            host=os.environ["DB_HOST"],
-            port=os.environ["DB_PORT"],
-        )
+        # Use Supabase connection URL instead of individual parameters
+        DB_CONN = psycopg2.connect(os.environ["SUPABASE_DB_URL"])
     return DB_CONN
-
 
 def parse_embedding(embedding_str):
     # Convert string representation of list to Python list
@@ -35,7 +37,6 @@ def cosine_similarity(vec1_str, vec2_str):
     v1 = parse_embedding(vec1_str)
     v2 = parse_embedding(vec2_str)
     return float(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
-
 
 @app.post("/upload_resume")
 async def upload_resume(file: UploadFile):
@@ -62,7 +63,6 @@ async def upload_resume(file: UploadFile):
         cur.close()
     
     return {"candidate_id": candidate_id}
-
 
 @app.get("/match_jobs/{candidate_id}")
 async def match_jobs(candidate_id: int):
