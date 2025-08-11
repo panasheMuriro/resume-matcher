@@ -5,3 +5,4 @@ requests
 numpy
 pymupdf
 python-multipart
+cohere

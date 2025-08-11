@@ -2,6 +2,7 @@ import os
 import requests
 import psycopg2
 from dotenv import load_dotenv
+import cohere
 
 # Load .env file
 load_dotenv()
@@ -11,26 +12,23 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL is not set in the environment or .env file")
 
-OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434/api/embeddings")
+COHERE_API_KEY = os.getenv("COHERE_API_KEY")
+if not COHERE_API_KEY:
+    raise ValueError("COHERE_API_KEY is not set in the environment or .env file")
+
+co = cohere.Client(COHERE_API_KEY)
 
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL)
 
-def get_ollama_embedding(text: str) -> list:
-    payload = {
-        "model": "nomic-embed-text",
-        "prompt": text
-    }
-    response = requests.post(OLLAMA_API_URL, json=payload)
-    response.raise_for_status()
-    data = response.json()
-    emb = data.get("embedding")
-    if not emb or len(emb) == 0:
-        raise ValueError("Received empty embedding from Ollama API")
-    return emb
+def get_cohere_embedding(text: str) -> list:
+    response = co.embed(texts=[text])
+    embedding = response.embeddings[0]
+    return embedding
+
 
 def insert_job(title: str, description: str):
-    embedding = get_ollama_embedding(f"{title} {description}")
+    embedding = get_cohere_embedding(f"{title} {description}")
 
     conn = get_db_connection()
     cur = conn.cursor()
@@ -45,11 +43,12 @@ def insert_job(title: str, description: str):
     conn.close()
 
 def search_jobs(query: str, limit: int = 5):
-    query_embedding = get_ollama_embedding(query)
+    query_embedding = get_cohere_embedding(query)
 
     conn = get_db_connection()
     cur = conn.cursor()
 
+    # Assuming your DB supports vector similarity with '<=>'
     cur.execute("""
         SELECT id, title, description,
                1 - (embedding <=> %s) AS similarity

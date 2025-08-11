@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile
 import tempfile
 import os
-from embedding_utils import get_ollama_embedding, get_db_connection
+from embedding_utils import get_cohere_embedding, get_db_connection
 from resume_utils import extract_text_from_pdf
 import numpy as np
 import ast
@@ -12,14 +12,10 @@ def parse_embedding(embedding_str):
     emb_list = ast.literal_eval(embedding_str)
     return np.array([float(x) for x in emb_list])
 
-# def cosine_similarity(vec1, vec2):
-#     return float(np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2)))
 def cosine_similarity(vec1, vec2):
     v1 = np.array(vec1, dtype=float)
     v2 = np.array(vec2, dtype=float)
     return float(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
-
-
 
 @app.post("/upload_resume")
 async def upload_resume(file: UploadFile):
@@ -28,7 +24,7 @@ async def upload_resume(file: UploadFile):
         tmp_path = tmp.name
     
     resume_text = extract_text_from_pdf(tmp_path)
-    embedding = get_ollama_embedding(resume_text)
+    embedding = get_cohere_embedding(resume_text)
     
     conn = get_db_connection()
     cur = conn.cursor()
@@ -46,8 +42,6 @@ async def upload_resume(file: UploadFile):
         cur.close()
     
     return {"candidate_id": candidate_id}
-
-import ast
 
 @app.get("/match_jobs/{candidate_id}")
 async def match_jobs(candidate_id: int):
